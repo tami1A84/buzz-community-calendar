@@ -2,7 +2,7 @@
 
 [Buzz](https://buzz.xyz) 用のコミュニティカレンダープラグインです。左端のアイコン列 (ドック) にカレンダーを追加し、コミュニティのライブ中ハドルと自分の予定を表示します。
 
-![スクリーンショット]([https://png.communities.buzz.xyz/media/dfc6d767e281f36db5d2f386b26695433ace9f290dcaae0dbca4a52f67349b1b.png])
+![スクリーンショット]([(https://blossom.ditto.pub/ef6b131b048d3dd085a8f6aefd730cf9eeb0d3f767bbee7ce7a3300b80ba5c8a.png)])
 
 ## 機能
 
