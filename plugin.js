@@ -68,6 +68,7 @@ const STRINGS = {
     weekOf: (day) => `${day} の週`,
     dayTitle: (d, w) => `${d.getMonth() + 1}月${d.getDate()}日 (${w})`,
     language: "言語",
+    calendarTitle: "カレンダー",
   },
   en: {
     languageName: "English",
@@ -123,6 +124,7 @@ const STRINGS = {
     weekOf: (day) => `Week of ${day}`,
     dayTitle: (d, w) => `${w} ${d.getMonth() + 1}/${d.getDate()}`,
     language: "Language",
+    calendarTitle: "Calendar",
   },
 };
 const LOCALES = Object.keys(STRINGS);
