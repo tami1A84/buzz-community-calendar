@@ -1,0 +1,7 @@
+{
+  "id": "n.community-calendar",
+  "name": "Community Calendar",
+  "apiVersion": 1,
+  "description": "カレンダーページと左サイドバーのセクションで、コミュニティのライブ中のハドルと今後の予定を表示し、イベントを作成できます。",
+  "discovery": { "category": "productivity", "tags": ["calendar", "huddles", "events"] }
+}
