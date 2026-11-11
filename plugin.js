@@ -9,13 +9,142 @@ const PLUGIN_ID = "n.community-calendar";
 const PAGE_ID = "calendar";
 const STORE_KEY = "n.community-calendar:events";
 const PREFS_KEY = "n.community-calendar:prefs";
-const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
-const KINDS = { meeting: "会議", plan: "予定" };
+// ---------- i18n ----------
+// Fork-friendly: copy a locale object, translate the values (and the two
+// weekday arrays), add `languageName`, and it appears in the language
+// selector. Missing keys fall back to `ja`.
+const STRINGS = {
+  ja: {
+    languageName: "日本語",
+    weekdays: ["日", "月", "火", "水", "木", "金", "土"],
+    meeting: "会議",
+    plan: "予定",
+    kindMeetingOption: "会議 (ハドル)",
+    kindPlanOption: "予定",
+    viewToday: "今日",
+    viewWeek: "週",
+    viewMonth: "月",
+    viewYear: "年",
+    weekStartSun: "週の始まり: 日曜",
+    weekStartMon: "週の始まり: 月曜",
+    weekStartTitle: "週の始まりを切り替えます",
+    newEvent: "＋ 予定",
+    liveNow: "今のハドル",
+    join: "参加する",
+    openHuddle: "ハドルを開く",
+    share: "共有",
+    shareTitle: "リンク先チャンネルにこの予定を投稿します",
+    cancel: "キャンセル",
+    removeRow: "削除",
+    editEvent: "予定を編集",
+    addEvent: "予定を追加",
+    update: "更新",
+    addBtn: "追加",
+    titlePh: "タイトル",
+    dateLabel: "日付",
+    startTimeLabel: "開始時刻",
+    endTimeLabel: "終了時刻 (任意)",
+    kindLabel: "種類",
+    channelLabel: "チャンネル",
+    noChannel: "なし",
+    channelFallback: "チャンネル",
+    startedAt: "開始",
+    notesPh: "メモ (任意)",
+    meetingHint:
+      "会議にはチャンネルへのリンクが付きます。開始時になったら予定の「ハドル」ボタンからそのチャンネルを開き、huddle を開始してください。",
+    persistWarn: "注意: 保存できませんでした。このセッションだけ残ります。",
+    membersLabel: "メンバー (任意)",
+    membersPh: "メンバーを検索して追加…",
+    removeMember: "外す",
+    self: "(自分)",
+    prev: "前へ",
+    next: "次へ",
+    allDay: "終日",
+    shared: "チャンネルに共有しました ✓",
+    shareFailed: "共有できませんでした",
+    noRelay: "リレーに接続されていません",
+    pickChannel: "共有先のチャンネルを選んでください",
+    cannotPost: "この接続では投稿できません",
+    weekOf: (day) => `${day} の週`,
+    dayTitle: (d, w) => `${d.getMonth() + 1}月${d.getDate()}日 (${w})`,
+    language: "言語",
+  },
+  en: {
+    languageName: "English",
+    weekdays: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+    meeting: "Meeting",
+    plan: "Plan",
+    kindMeetingOption: "Meeting (huddle)",
+    kindPlanOption: "Plan",
+    viewToday: "Today",
+    viewWeek: "Week",
+    viewMonth: "Month",
+    viewYear: "Year",
+    weekStartSun: "Week starts: Sunday",
+    weekStartMon: "Week starts: Monday",
+    weekStartTitle: "Toggle week start",
+    newEvent: "+ Event",
+    liveNow: "Live huddles",
+    join: "Join",
+    openHuddle: "Open huddle",
+    share: "Share",
+    shareTitle: "Post this event to the linked channel",
+    cancel: "Cancel",
+    removeRow: "Delete",
+    editEvent: "Edit event",
+    addEvent: "New event",
+    update: "Save",
+    addBtn: "Add",
+    titlePh: "Title",
+    dateLabel: "Date",
+    startTimeLabel: "Start",
+    endTimeLabel: "End (optional)",
+    kindLabel: "Type",
+    channelLabel: "Channel",
+    noChannel: "None",
+    channelFallback: "channel",
+    startedAt: "started",
+    notesPh: "Notes (optional)",
+    meetingHint:
+      "Meetings link to their channel. When it starts, use the event's huddle button to open the channel and start a huddle.",
+    persistWarn: "Note: could not save; kept for this session only.",
+    membersLabel: "Members (optional)",
+    membersPh: "Search members to add…",
+    removeMember: "Remove",
+    self: "(you)",
+    prev: "Previous",
+    next: "Next",
+    allDay: "All day",
+    shared: "Shared to the channel ✓",
+    shareFailed: "Could not share",
+    noRelay: "Not connected to the relay",
+    pickChannel: "Choose a channel to share to",
+    cannotPost: "This connection cannot post",
+    weekOf: (day) => `Week of ${day}`,
+    dayTitle: (d, w) => `${w} ${d.getMonth() + 1}/${d.getDate()}`,
+    language: "Language",
+  },
+};
+const LOCALES = Object.keys(STRINGS);
+const LOCALE_KEY = "n.community-calendar:locale";
+function loadLocale() {
+  try {
+    const v = JSON.parse(localStorage.getItem(LOCALE_KEY) ?? "null");
+    if (v && STRINGS[v]) return v;
+  } catch {}
+  const langs =
+    typeof navigator !== "undefined"
+      ? navigator.languages ?? [navigator.language]
+      : [];
+  for (const l of langs)
+    if (STRINGS[String(l).slice(0, 2).toLowerCase()]) return String(l).slice(0, 2).toLowerCase();
+  return "ja";
+}
 const VIEWS = [
-  { id: "today", label: "今日" },
-  { id: "week", label: "週" },
-  { id: "month", label: "月" },
-  { id: "year", label: "年" },
+  { id: "today", key: "viewToday" },
+  { id: "week", key: "viewWeek" },
+  { id: "month", key: "viewMonth" },
+  { id: "year", key: "viewYear" },
 ];
 const HOUR_H = 46;
 const GRID_H = HOUR_H * 24;
@@ -113,9 +242,23 @@ export function apply(ctx) {
       // keep session value
     }
   }
+  // ---------- locale ----------
+  const localeStore = createStore(loadLocale());
+  function setLocale(v) {
+    localeStore.set(v);
+    try {
+      localStorage.setItem(LOCALE_KEY, JSON.stringify(v));
+    } catch {}
+  }
+  const t = (key) => STRINGS[localeStore.get()]?.[key] ?? STRINGS.ja[key] ?? key;
+  const weekdays = () => STRINGS[localeStore.get()].weekdays;
+  function kindName(kind) {
+    const s = STRINGS[localeStore.get()];
+    return kind === "meeting" ? s.meeting : s.plan;
+  }
   const weekOffset = (start) => (start === "mon" ? 1 : 0);
   const orderedWeekdays = (start) =>
-    start === "mon" ? [...WEEKDAYS.slice(1), WEEKDAYS[0]] : WEEKDAYS;
+    start === "mon" ? [...weekdays().slice(1), weekdays()[0]] : weekdays();
   const weekdayColor = (w) =>
     w === "日"
       ? "var(--color-red-9, #e5484d)"
@@ -253,13 +396,13 @@ export function apply(ctx) {
     return shiftDays(s, -((parseDate(s).getDay() + 7 - off) % 7));
   }
   function label(ev) {
-    if (!ev.time) return `終日 ${ev.title}`;
+    if (!ev.time) return `${t("allDay")} ${ev.title}`;
     const span = ev.end && ev.end > ev.time ? `${ev.time}–${ev.end}` : ev.time;
     return `${span} ${ev.title}`;
   }
   function dayTitle(s) {
     const d = parseDate(s);
-    return `${d.getMonth() + 1}月${d.getDate()}日 (${WEEKDAYS[d.getDay()]})`;
+    return STRINGS[localeStore.get()].dayTitle(d, weekdays()[d.getDay()]);
   }
   const clockOf = (sec) => {
     const d = new Date(sec * 1000);
@@ -295,16 +438,16 @@ export function apply(ctx) {
     const snap = relay?.snapshot();
     const outbox = snap?.session?.outbox;
     if (!snap || snap.status !== "ready" || !outbox?.send)
-      return "リレーに接続されていません";
-    if (!draft.channel) return "共有先のチャンネルを選んでください";
+      return t("noRelay");
+    if (!draft.channel) return t("pickChannel");
     if (typeof outbox.supports === "function" && !outbox.supports(9))
-      return "この接続では投稿できません";
+      return t("cannotPost");
     const when = draft.time
       ? `${draft.date} ${draft.time}${draft.end && draft.end > draft.time ? `–${draft.end}` : ""}`
-      : `${draft.date} 終日`;
+      : `${draft.date} ${t("allDay")}`;
     const memberNames = (draft.members ?? []).map((m) => nameOf(m, peopleStore.get()));
     const lines = [
-      `📅 ${when} ${KINDS[draft.kind] ?? "予定"}: ${draft.title}`,
+      `📅 ${when} ${kindName(draft.kind) ?? t("plan")}: ${draft.title}`,
       memberNames.length ? `👥 ${memberNames.join(", ")}` : "",
       draft.notes ? `📝 ${draft.notes}` : "",
     ].filter(Boolean);
@@ -313,7 +456,7 @@ export function apply(ctx) {
       outbox.send({ kind: 9, content: lines.join("\n"), tags: [["h", draft.channel]] });
       return true;
     } catch (err) {
-      return `共有できませんでした: ${err?.message ?? err}`;
+      return `${t("shareFailed")}: ${err?.message ?? err}`;
     }
   }
 
@@ -363,7 +506,7 @@ export function apply(ctx) {
         className: "ui-card",
         style: { padding: "10px 14px", display: "flex", flexDirection: "column", gap: 6 },
       },
-      e("h3", { style: { margin: 0, fontSize: 14 } }, "今のハドル"),
+      e("h3", { style: { margin: 0, fontSize: 14 } }, t("liveNow")),
       ...rows.map((r) =>
         e(
           "div",
@@ -376,7 +519,7 @@ export function apply(ctx) {
           e(
             "span",
             { style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
-            `${r.parentName ?? r.parent ?? "チャンネル"} · ${clockOf(r.startedAt)} 開始`,
+            `${r.parentName ?? r.parent ?? t("channelFallback")} · ${clockOf(r.startedAt)} ${t("startedAt")}`,
           ),
           e(
             "button",
@@ -385,7 +528,7 @@ export function apply(ctx) {
               onClick: () => onOpen(r),
               style: { background: ACCENT, color: ACCENT_INK, fontWeight: 600 },
             },
-            "参加する",
+            t("join"),
           ),
         ),
       ),
@@ -412,7 +555,7 @@ export function apply(ctx) {
     return e(
       "div",
       { style: { display: "flex", flexDirection: "column", gap: 6, position: "relative" } },
-      e("span", { style: { fontSize: 12, color: TEXT_SUBTLE } }, "メンバー (任意)"),
+      e("span", { style: { fontSize: 12, color: TEXT_SUBTLE } }, t("membersLabel")),
       sel.length
         ? e(
             "div",
@@ -437,7 +580,7 @@ export function apply(ctx) {
                   "button",
                   {
                     type: "button",
-                    "aria-label": "外す",
+                    "aria-label": t("removeMember"),
                     onClick: () => toggle(key),
                     style: { all: "unset", cursor: "pointer", lineHeight: 1 },
                   },
@@ -448,7 +591,7 @@ export function apply(ctx) {
           )
         : null,
       e("input", {
-        placeholder: "メンバーを検索して追加…",
+        placeholder: t("membersPh"),
         value: query,
         onChange: (ev) => setQuery(ev.target.value),
       }),
@@ -500,7 +643,7 @@ export function apply(ctx) {
                 e("span", { style: { width: 16 } }, sel.includes(c.pubkey) ? "☑" : "☐"),
                 e("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, displayName(c)),
                 c.isAgent ? e("span", { style: { color: TEXT_SUBTLE, fontSize: 11 } }, "🤖") : null,
-                c.viewer ? e("span", { style: { color: TEXT_SUBTLE, fontSize: 11 } }, "(自分)") : null,
+                c.viewer ? e("span", { style: { color: TEXT_SUBTLE, fontSize: 11 } }, t("self")) : null,
               ),
             ),
           )
@@ -534,7 +677,7 @@ export function apply(ctx) {
         members: members.length ? members : undefined,
         notes: notes.trim() || undefined,
       });
-      setShareMsg(res === true ? "チャンネルに共有しました ✓" : String(res ?? "共有できませんでした"));
+      setShareMsg(res === true ? t("shared") : String(res ?? t("shareFailed")));
       setTimeout(() => setShareMsg(""), 5000);
     };
     const field = (labelText, node) =>
@@ -576,35 +719,35 @@ export function apply(ctx) {
       e(
         "div",
         { style: { display: "flex", alignItems: "center", gap: 8 } },
-        e("h3", { style: { margin: 0, flex: 1, fontSize: 16 } }, isEdit ? "予定を編集" : "予定を追加"),
+        e("h3", { style: { margin: 0, flex: 1, fontSize: 16 } }, isEdit ? t("editEvent") : t("addEvent")),
         onShare
           ? e(
               "button",
               {
                 type: "button",
                 disabled: !title.trim() || !channel,
-                title: "リンク先チャンネルにこの予定を投稿します",
+                title: t("shareTitle"),
                 onClick: share,
               },
-              "共有",
+              t("share"),
             )
           : null,
         kind === "meeting" && initial.channel && onOpenChannel
           ? e(
               "button",
               { type: "button", onClick: () => onOpenChannel(initial.channel) },
-              "ハドルを開く",
+              t("openHuddle"),
             )
           : null,
-        e("button", { type: "button", onClick: onCancel }, "キャンセル"),
-        isEdit ? e("button", { type: "button", onClick: onDelete }, "削除") : null,
+        e("button", { type: "button", onClick: onCancel }, t("cancel")),
+        isEdit ? e("button", { type: "button", onClick: onDelete }, t("removeRow")) : null,
       ),
       persistOk
         ? null
-        : e("p", { style: { margin: 0, fontSize: 12, color: TEXT_SUBTLE } }, "注意: 保存できませんでした。このセッションだけ残ります。"),
+        : e("p", { style: { margin: 0, fontSize: 12, color: TEXT_SUBTLE } }, t("persistWarn")),
       e("input", {
         required: true,
-        placeholder: "タイトル",
+        placeholder: t("titlePh"),
         value: title,
         autoFocus: true,
         onChange: (ev) => setTitle(ev.target.value),
@@ -613,26 +756,26 @@ export function apply(ctx) {
       e(
         "div",
         { style: { display: "flex", gap: 10, flexWrap: "wrap" } },
-        field("日付", e("input", { type: "date", required: true, value: date, onChange: (ev) => setDate(ev.target.value) })),
-        field("開始時刻", e("input", { type: "time", value: time, step: 300, onChange: (ev) => setTime(ev.target.value) })),
-        field("終了時刻 (任意)", e("input", { type: "time", value: end, step: 300, onChange: (ev) => setEnd(ev.target.value) })),
+        field(t("dateLabel"), e("input", { type: "date", required: true, value: date, onChange: (ev) => setDate(ev.target.value) })),
+        field(t("startTimeLabel"), e("input", { type: "time", value: time, step: 300, onChange: (ev) => setTime(ev.target.value) })),
+        field(t("endTimeLabel"), e("input", { type: "time", value: end, step: 300, onChange: (ev) => setEnd(ev.target.value) })),
         field(
-          "種類",
+          t("kindLabel"),
           e(
             "select",
             { value: kind, onChange: (ev) => setKind(ev.target.value) },
-            e("option", { value: "meeting" }, "会議 (ハドル)"),
-            e("option", { value: "plan" }, "予定"),
+            e("option", { value: "meeting" }, t("kindMeetingOption")),
+            e("option", { value: "plan" }, t("kindPlanOption")),
           ),
         ),
       ),
       channels.length
         ? field(
-            "チャンネル",
+            t("channelLabel"),
             e(
               "select",
               { value: channel, onChange: (ev) => setChannel(ev.target.value) },
-              e("option", { value: "" }, "なし"),
+              e("option", { value: "" }, t("noChannel")),
               ...channels.map((c) => e("option", { key: c.id, value: c.id }, `#${c.name}`)),
             ),
           )
@@ -642,7 +785,7 @@ export function apply(ctx) {
         ? e("p", { style: { margin: 0, fontSize: 12, color: ACCENT_TEXT } }, shareMsg)
         : null,
       e("textarea", {
-        placeholder: "メモ (任意)",
+        placeholder: t("notesPh"),
         rows: 2,
         value: notes,
         onChange: (ev) => setNotes(ev.target.value),
@@ -660,7 +803,7 @@ export function apply(ctx) {
             fontSize: 14,
           },
         },
-        isEdit ? "更新" : "追加",
+        isEdit ? t("update") : t("addBtn"),
       ),
     );
   }
@@ -757,8 +900,8 @@ export function apply(ctx) {
           },
           e(
             "span",
-            { style: { fontSize: 11, color: weekdayColor(WEEKDAYS[d.getDay()]) ?? TEXT_SUBTLE } },
-            WEEKDAYS[d.getDay()],
+            { style: { fontSize: 11, color: weekdayColor(weekdays()[d.getDay()]) ?? TEXT_SUBTLE } },
+            weekdays()[d.getDay()],
           ),
           e(DayNumber, { iso, size: 20 }),
         ),
@@ -1081,6 +1224,7 @@ export function apply(ctx) {
     const channels = useSyncExternalStore(channelsStore.subscribe, channelsStore.get);
     const people = useSyncExternalStore(peopleStore.subscribe, peopleStore.get);
     const weekStart = useSyncExternalStore(prefsStore.subscribe, prefsStore.get);
+    useSyncExternalStore(localeStore.subscribe, localeStore.get);
     const now = new Date();
     const [view, setView] = useState("month");
     const [cursor, setCursor] = useState({ y: now.getFullYear(), m: now.getMonth() });
@@ -1156,7 +1300,8 @@ export function apply(ctx) {
     };
     const rangeLabel = () => {
       if (view === "today") return dayTitle(selected);
-      if (view === "week") return `${dayTitle(startOfWeek(selected, weekStart))} の週`;
+      if (view === "week")
+        return STRINGS[localeStore.get()].weekOf(dayTitle(startOfWeek(selected, weekStart)));
       if (view === "month") return `${cursor.y}年${cursor.m + 1}月`;
       return `${cursor.y}年`;
     };
@@ -1185,7 +1330,7 @@ export function apply(ctx) {
             color: view === v.id ? ACCENT_INK : TEXT_SUBTLE,
           },
         },
-        v.label,
+        t(v.key),
       );
 
     const body =
@@ -1248,14 +1393,25 @@ export function apply(ctx) {
           {
             type: "button",
             onClick: () => setWeekStart(weekStart === "sun" ? "mon" : "sun"),
-            title: "週の始まりを切り替えます",
+            title: t("weekStartTitle"),
           },
-          `週の始まり: ${weekStart === "sun" ? "日曜" : "月曜"}`,
+          t(weekStart === "sun" ? "weekStartSun" : "weekStartMon"),
+        ),
+        e(
+          "select",
+          {
+            value: localeStore.get(),
+            onChange: (ev) => setLocale(ev.target.value),
+            "aria-label": t("language"),
+          },
+          ...LOCALES.map((l) =>
+            e("option", { key: l, value: l }, STRINGS[l].languageName),
+          ),
         ),
         e("div", { style: { flex: 1 } }),
-        e("button", { type: "button", onClick: () => step(-1), "aria-label": "前へ" }, "◀"),
+        e("button", { type: "button", onClick: () => step(-1), "aria-label": t("prev") }, "◀"),
         e("button", { type: "button", onClick: goToday }, "今日"),
-        e("button", { type: "button", onClick: () => step(1), "aria-label": "次へ" }, "▶"),
+        e("button", { type: "button", onClick: () => step(1), "aria-label": t("next") }, "▶"),
         e("strong", { style: { fontSize: 15 } }, rangeLabel()),
         e(
           "button",
@@ -1264,7 +1420,7 @@ export function apply(ctx) {
             onClick: () => openCreate(selected),
             style: { background: ACCENT, color: ACCENT_INK, fontWeight: 600 },
           },
-          "＋ 予定",
+          t("newEvent"),
         ),
       ),
       body,
@@ -1292,7 +1448,7 @@ export function apply(ctx) {
 
   ctx.pages.register({
     id: PAGE_ID,
-    title: "カレンダー",
+    title: t("calendarTitle"),
     primary: true,
     placement: "dock",
     icon:
